@@ -50,7 +50,7 @@ module Chronic
     #
     # Returns a new Time object, or Chronic::Span if :guess option is false.
     def parse(text, opts={})
-      options = DEFAULT_OPTIONS.merge opts
+      options = DEFAULT_OPTIONS.merge(opts)
 
       # ensure the specified options are valid
       (opts.keys - DEFAULT_OPTIONS.keys).each do |key|
@@ -123,7 +123,74 @@ module Chronic
       text.gsub!(/\b\d+:?\d*[ap]\b/,'\0m')
       text.gsub!(/(\d)([ap]m|oclock)\b/, '\1 \2')
       text.gsub!(/\b(hence|after|from)\b/, 'future')
+
+      # add holiday support
+      text.gsub!(/\bs(ain)?t.? patrick'?s?( day)?\b/, 'march 17')
+      text.gsub!(/\b(4|four|for)th of july\b/, 'july 4th')
+      text.gsub!(/\bindependence( day)?\b/, 'july 4th')
+      text.gsub!(/\bchristmas( day)?\b/, 'december 25')
+      text.gsub!(/\bchristmas eve(ning)?\b/, 'december 24')
+      text.gsub!(/\bgroundhog( day)?\b/, 'february 2')
+      text.gsub!(/\bhalloween\b/, 'october 31')
+      text.gsub!(/\bvalentine'?s?( day)?\b/, 'february 14')
+      text.gsub!(/\bpresident'?s? day\b/, '3rd monday in february')
+      text.gsub!(/\bthanksgiving( day)?\b/, '4th thursday in november')
+      text.gsub!(/\blabor( day)?\b/, '1st monday in september')
+      text.gsub!(/\bfather'?s?( day)?\b/, '3rd sunday in jun')
+      text.gsub!(/\bmother'?s?( day)?\b/, '2nd sunday in may')
+      text.gsub!(/\bfirst night\b/, 'december 31')
+      text.gsub!(/\bnye\b/, 'december 31')
+      text.gsub!(/\bnew years? day\b/, 'january 1')
+      text.gsub!(/\bnew years?( eve)?\b/, 'december 31')
+      text.gsub!(/\bc?hann?[uaei]kk?ah?\b/, 'december 25 to january 1')
+      text.gsub!(/\bcin[cq][oa] d[eia] mayo?\b/, 'may 5')
+      if text.match(/\bmemorial( day)?\b/)
+        to_check = Chronic.parse('5th monday in may', options)
+        text.gsub!(/\bmemorial( day)?\b/, (to_check.nil? || to_check.month==6 ? '4th monday in may' : '5th monday in may'))
+      end
+
+      # Oktoberfest always ends in the first weekend of October and takes
+      # two days.  It lasts for 2 weeks, so it always starts around mid
+      # September.
+      if text.match(/\bo[ck]toberfest\b/)
+        to_check = Chronic.parse('1st sunday in october', options)
+        start = to_check - 14.days
+        text.gsub!(/\bo[ck]toberfest\b/, "#{start.strftime("%m / %d / %Y")} to 1st sunday in october")
+      end
+
+      if text.match(/\beaster\b/)
+        text =~ /\b(\d+)\b/
+        year_present = $1
+
+        easter_ts = if year_present
+                      calculate_easter($1.to_i)
+                    else
+                      this_year_easter = calculate_easter(Chronic.now.year)
+                      next_year_easter = calculate_easter(Chronic.now.year + 1)
+                      Chronic.now < this_year_easter ? this_year_easter : next_year_easter
+                    end
+        time_format = "%m / %d"
+        time_format += " / %Y" if !year_present
+        text.gsub!(/\beaster\b/, easter_ts.strftime(time_format))
+      end
       text
+    end
+
+    # Calculate easter based on the year
+    # http://aa.usno.navy.mil/faq/docs/easter.php
+    def calculate_easter(y)
+      c = y / 100
+      n = y - 19 * ( y / 19 )
+      k = ( c - 17 ) / 25
+      i = c - c / 4 - ( c - k ) / 3 + 19 * n + 15
+      i = i - 30 * ( i / 30 )
+      i = i - ( i / 28 ) * ( 1 - ( i / 28 ) * ( 29 / ( i + 1 ) ) * ( ( 21 - n ) / 11 ) )
+      j = y + y / 4 + i + 2 - c + c / 4
+      j = j - 7 * ( j / 7 )
+      l = i - j
+      m = 3 + ( l + 40 ) / 44
+      d = l + 28 - 31 * ( m / 4 )
+      ts = Time.parse("#{y}-#{m}-#{d}")
     end
 
     # Convert number words to numbers (three => 3, fourth => 4th).
