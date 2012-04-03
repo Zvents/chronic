@@ -99,7 +99,7 @@ module Chronic
     #     #=> "136 days future this second"
     #
     # Returns a new String ready for Chronic to parse.
-    def pre_normalize(text)
+    def pre_normalize(text, options = {})
       text = text.to_s.downcase
       text.gsub!(/\./, ':')
       text.gsub!(/['"]/, '')
@@ -351,7 +351,7 @@ module Chronic
     private
 
     def tokenize(text, options)
-      text = pre_normalize(text)
+      text = pre_normalize(text,options)
       tokens = text.split(' ').map { |word| Token.new(word) }
       [Repeater, Grabber, Pointer, Scalar, Ordinal, Separator, TimeZone].each do |tok|
         tok.scan(tokens, options)
