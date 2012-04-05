@@ -1,3 +1,4 @@
+require 'ruby-debug'
 module Chronic
 
   # Returns a Hash of default configuration options.
@@ -50,6 +51,7 @@ module Chronic
     #
     # Returns a new Time object, or Chronic::Span if :guess option is false.
     def parse(text, opts={})
+      @options = opts.dup
       options = DEFAULT_OPTIONS.merge(opts)
 
       # ensure the specified options are valid
@@ -99,7 +101,7 @@ module Chronic
     #     #=> "136 days future this second"
     #
     # Returns a new String ready for Chronic to parse.
-    def pre_normalize(text, options = {})
+    def pre_normalize(text)
       text = text.to_s.downcase
       text.gsub!(/\./, ':')
       text.gsub!(/['"]/, '')
@@ -142,7 +144,7 @@ module Chronic
       text.gsub!(/\bnye\b/, 'december 31')
       text.gsub!(/\bnew years? day\b/, 'january 1')
       text.gsub!(/\bnew years?( eve)?\b/, 'december 31')
-      text.gsub!(/\bc?hann?[uaei]kk?ah?\b/, 'december 25 to january 1')
+      text.gsub!(/\bc?hann?[uaei]kk?ah?\b/, 'december 23')
       text.gsub!(/\bcin[cq][oa] d[eia] mayo?\b/, 'may 5')
       if text.match(/\bmemorial( day)?\b/)
         to_check = Chronic.parse('5th monday in may', options)
@@ -152,11 +154,8 @@ module Chronic
       # Oktoberfest always ends in the first weekend of October and takes
       # two days.  It lasts for 2 weeks, so it always starts around mid
       # September.
-      if text.match(/\bo[ck]toberfest\b/)
-        to_check = Chronic.parse('1st sunday in october', options)
-        start = to_check - 14.days
-        text.gsub!(/\bo[ck]toberfest\b/, "#{start.strftime("%m / %d / %Y")} to 1st sunday in october")
-      end
+
+      text = "1st sunday in october" if text.match(/\bo[ck]toberfest\b/)
 
       if text.match(/\beaster\b/)
         text =~ /\b(\d+)\b/
@@ -351,7 +350,7 @@ module Chronic
     private
 
     def tokenize(text, options)
-      text = pre_normalize(text,options)
+      text = pre_normalize(text)
       tokens = text.split(' ').map { |word| Token.new(word) }
       [Repeater, Grabber, Pointer, Scalar, Ordinal, Separator, TimeZone].each do |tok|
         tok.scan(tokens, options)
