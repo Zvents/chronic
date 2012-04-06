@@ -1,4 +1,3 @@
-require 'ruby-debug'
 module Chronic
 
   # Returns a Hash of default configuration options.
